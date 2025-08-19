@@ -1,0 +1,6 @@
+{
+  "parameters": {
+    "hubSubscriptionId": { "value": "<hub-subscription-guid>" },
+    "spokeSubscriptionId": { "value": "<spoke-subscription-guid>" }
+  }
+}
