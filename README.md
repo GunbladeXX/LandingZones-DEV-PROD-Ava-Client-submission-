@@ -1,41 +1,83 @@
-# LandingZones-DEV-PROD-Ava-Client-submission-
-Landing zones DEV/PROD for the skill test review
-_________________________________________________
-Initial Structure (Overview & Phase 1)
+# AVA Landing Zone (Hub & Spoke)
 
-🔹Project Purpose
-Short description of the landing zone architecture and what this repository delivers.
+This repository contains an Azure Landing Zone deployment using **Bicep** and **GitHub Actions**, based on a phased architecture (Hub + Spoke model).  
+It is designed for submission to an employer and demonstrates both **infrastructure-as-code** and **CI/CD operational deployment**.
 
-🔹Architecture Overview
-Brief explanation of the hub & spoke setup (AVA naming convention, phased Bicep modules, GitHub Actions pipeline, environments dev and prod, region westeurope).
+---
 
-🔹Naming Convention
-Description and a small table showing AVA + resource abbreviation + index (AvaVnetHub1, AvaVnetSpoke1, AvaAgw1, etc.).
+## 🧱 Architecture Overview
 
-🔹Deployment Flow
+The landing zone is divided into two areas:
 
-Clone repo
+| Area | Description |
+|------|-------------|
+| **Platform (Hub)** | Centralized network / shared services (Hub VNet, Firewall, Bastion, Private DNS, etc.) |
+| **Application (Spoke)** | Workload subscription (App Gateway, VM Scale Sets, Key Vault, Log Analytics, etc.) |
 
-Configure GitHub environments (dev, prod)
+All components follow a **phased deployment approach** using modular Bicep files (Phase 1 → Phase 7).
 
-Add Service Principal secrets to GitHub repository secrets
+Deployments are performed via a **GitHub Actions pipeline** that targets two environments:  
+**`dev`** and **`prod`** (including `what-if` and approval for production deployments).
 
-Trigger workflow → what-if on dev → deploy
+---
 
-Approved promotion to prod
+## 📛 Naming Convention
 
-🔹Phase 1 Description
+All resources follow the naming pattern:
 
-Deploy Hub Virtual Network (AvaVnetHub1) in westeurope
+**`AVA` + `<ResourceTypeAbbreviation>` + `<Index>`**
 
-Create subnets
+| Resource Type | Example Name |
+|---------------|-------------------|
+| Subscription | AvaSub1 |
+| Hub VNet | AvaVnetHub1 |
+| Spoke VNet | AvaVnetSpoke1 |
+| Key Vault | AvaKv1 |
+| Storage Account | AvaStrg1 |
+| Log Analytics | AvaLog1 |
+| Firewall | AvaFw1 |
+| Scale Set | AvaVmssFront1 / AvaVmssBack1 |
+| Application Gateway | AvaAgw1 |
 
-FirewallSubnet
+---
 
-AzureBastionSubnet
+## 🚀 Deployment Flow (GitHub Actions)
 
-(placeholder) GatewaySubnet
+1. Configure GitHub **environments**:  
+   - `dev`  
+   - `prod` (with manual approval)
+2. Add Service Principal credentials to repository **secrets** (`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `AZURE_CLIENT_SECRET`).
+3. Commit/push to `main`.
+4. GitHub Actions will:
+   - Run `az deployment what-if` for **dev**
+   - Deploy the phase modules to **dev**
+5. Promotion to **prod** is performed after approval via GitHub.
+6. The same pipeline runs `what-if` / deploy against `prod`.
 
-(Firewall resource itself will be deployed in Phase 2, this phase is only the network foundation)
+---
 
-Outputs: VNet resource ID + subnet IDs → consumed by future phases
+## ✅ Phase 1 – Hub Network (AvaVnetHub1)
+
+**Purpose:**  
+Create the Hub Virtual Network foundation in the region `westeurope`.
+
+**Resources deployed in Phase 1:**
+
+| Resource | Name | Notes |
+|---------|----------------|------------------------------|
+| Virtual Network | AvaVnetHub1 | Primary Hub VNet |
+| Subnet | AzureFirewallSubnet | Required for Firewall (Phase 2) |
+| Subnet | AzureBastionSubnet | Required for Bastion (Phase 2) |
+| Subnet | GatewaySubnet | Placeholder for VPN/ER Gateway |
+
+> 🔔 **Firewall, Bastion and VPN/ExpressRoute gateways are *not* deployed in Phase 1.**  
+> Those will be deployed in **Phase 2** using separate Bicep modules.
+
+**Outputs:**  
+- Hub VNet resource ID  
+- Subnet IDs (used as inputs for subsequent phases)
+
+---
+
+### 📂 Folder / File Structure (Phase 1)
+
