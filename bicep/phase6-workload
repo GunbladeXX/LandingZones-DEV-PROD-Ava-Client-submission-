@@ -1,0 +1,268 @@
+// bicep/phase6-workload/main.bicep
+// Phase 6 – Workload Resources (Spoke)
+
+@description('Location')
+param location string = 'westeurope'
+
+@description('Spoke VNet name')
+param spokeVnetName string = 'AvaVnetSpoke1'
+
+@description('Application Gateway name')
+param applicationGatewayName string = 'AvaAgw1'
+
+@description('Internal Load Balancer name')
+param ilbName string = 'AvaLb1'
+
+@description('Frontend VMSS name')
+param frontendVmssName string = 'AvaVmssFront1'
+
+@description('Backend VMSS name')
+param backendVmssName string = 'AvaVmssBack1'
+
+//---------------------------------------------------------------------
+// Helper references
+var appSubnetId = resourceId('Microsoft.Network/virtualNetworks/subnets', spokeVnetName, 'AppSubnet')
+var dataSubnetId = resourceId('Microsoft.Network/virtualNetworks/subnets', spokeVnetName, 'DataSubnet')
+
+//---------------------------------------------------------------------
+// Application Gateway (WAF_v2)
+resource appGateway 'Microsoft.Network/applicationGateways@2023-09-01' = {
+  name: applicationGatewayName
+  location: location
+  sku: {
+    name: 'WAF_v2'
+    tier: 'WAF_v2'
+  }
+  properties: {
+    gatewayIPConfigurations: [
+      {
+        name: 'appGwIpConfig'
+        properties: {
+          subnet: {
+            id: appSubnetId
+          }
+        }
+      }
+    ]
+    frontendIPConfigurations: [
+      {
+        name: 'appGwFrontendIp'
+        properties: {
+          privateIPAllocationMethod: 'Dynamic'
+          subnet: {
+            id: appSubnetId
+          }
+        }
+      }
+    ]
+    frontendPorts: [
+      {
+        name: 'frontendPort'
+        properties: {
+          port: 80
+        }
+      }
+    ]
+    backendAddressPools: [
+      {
+        name: 'backendPool'
+      }
+    ]
+    backendHttpSettingsCollection: [
+      {
+        name: 'httpSettings'
+        properties: {
+          port: 80
+          protocol: 'Http'
+        }
+      }
+    ]
+    httpListeners: [
+      {
+        name: 'httpListener'
+        properties: {
+          frontendIPConfiguration: {
+            id: appGateway.properties.frontendIPConfigurations[0].id
+          }
+          frontendPort: {
+            id: appGateway.properties.frontendPorts[0].id
+          }
+          protocol: 'Http'
+        }
+      }
+    ]
+    requestRoutingRules: [
+      {
+        name: 'rule1'
+        properties: {
+          httpListener: {
+            id: appGateway.properties.httpListeners[0].id
+          }
+          backendAddressPool: {
+            id: appGateway.properties.backendAddressPools[0].id
+          }
+          backendHttpSettings: {
+            id: appGateway.properties.backendHttpSettingsCollection[0].id
+          }
+        }
+      }
+    ]
+  }
+}
+
+//---------------------------------------------------------------------
+// Internal Load Balancer
+resource ilb 'Microsoft.Network/loadBalancers@2023-09-01' = {
+  name: ilbName
+  location: location
+  properties: {
+    frontendIPConfigurations: [
+      {
+        name: 'ilbFrontend'
+        properties: {
+          privateIPAllocationMethod: 'Dynamic'
+          subnet: {
+            id: dataSubnetId
+          }
+        }
+      }
+    ]
+    backendAddressPools: [
+      {
+        name: 'ilbBackendPool'
+      }
+    ]
+    loadBalancingRules: [
+      {
+        name: 'httpRule'
+        properties: {
+          frontendIPConfiguration: {
+            id: ilb.properties.frontendIPConfigurations[0].id
+          }
+          backendAddressPool: {
+            id: ilb.properties.backendAddressPools[0].id
+          }
+          protocol: 'Tcp'
+          frontendPort: 80
+          backendPort: 80
+          enableFloatingIP: false
+          idleTimeoutInMinutes: 4
+        }
+      }
+    ]
+  }
+}
+
+//---------------------------------------------------------------------
+// Frontend VM Scale Set (Windows)
+resource frontendVmss 'Microsoft.Compute/virtualMachineScaleSets@2023-09-01' = {
+  name: frontendVmssName
+  location: location
+  sku: {
+    name: 'Standard_D2s_v3'
+    capacity: 2
+  }
+  properties: {
+    overprovision: true
+    upgradePolicy: {
+      mode: 'Manual'
+    }
+    virtualMachineProfile: {
+      networkProfile: {
+        networkInterfaceConfigurations: [
+          {
+            name: 'nicConfig'
+            properties: {
+              primary: true
+              ipConfigurations: [
+                {
+                  name: 'ipconfig'
+                  properties: {
+                    subnet: {
+                      id: appSubnetId
+                    }
+                    loadBalancerBackendAddressPools: [
+                      {
+                        id: ilb.properties.backendAddressPools[0].id
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+      storageProfile: {
+        imageReference: {
+          publisher: 'MicrosoftWindowsServer'
+          offer: 'WindowsServer'
+          sku: '2022-datacenter'
+          version: 'latest'
+        }
+      }
+      osProfile: {
+        computerNamePrefix: 'frontend'
+        adminUsername: 'azureuser'
+        adminPassword: 'P@ssw0rd1234!'
+      }
+    }
+  }
+}
+
+//---------------------------------------------------------------------
+// Backend VM Scale Set (Windows)
+resource backendVmss 'Microsoft.Compute/virtualMachineScaleSets@2023-09-01' = {
+  name: backendVmssName
+  location: location
+  sku: {
+    name: 'Standard_D2s_v3'
+    capacity: 2
+  }
+  properties: {
+    overprovision: true
+    upgradePolicy: {
+      mode: 'Manual'
+    }
+    virtualMachineProfile: {
+      networkProfile: {
+        networkInterfaceConfigurations: [
+          {
+            name: 'nicConfig'
+            properties: {
+              primary: true
+              ipConfigurations: [
+                {
+                  name: 'ipconfig'
+                  properties: {
+                    subnet: {
+                      id: dataSubnetId
+                    }
+                    loadBalancerBackendAddressPools: [
+                      {
+                        id: ilb.properties.backendAddressPools[0].id
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+      storageProfile: {
+        imageReference: {
+          publisher: 'MicrosoftWindowsServer'
+          offer: 'WindowsServer'
+          sku: '2022-datacenter'
+          version: 'latest'
+        }
+      }
+      osProfile: {
+        computerNamePrefix: 'backend'
+        adminUsername: 'azureuser'
+        adminPassword: 'P@ssw0rd1234!'
+      }
+    }
+  }
+}
