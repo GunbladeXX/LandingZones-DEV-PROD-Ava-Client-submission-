@@ -1,0 +1,81 @@
+// bicep/phase5-corePlatform/main.bicep
+// Phase 5 – Core Platform Services (Spoke)
+
+@description('Location for the resources')
+param location string = 'westeurope'
+
+@description('Name of the Spoke Virtual Network')
+param spokeVnetName string = 'AvaVnetSpoke1'
+
+@description('Name of the Key Vault')
+param keyVaultName string = 'AvaKv1'
+
+@description('Name of the Log Analytics Workspace')
+param logAnalyticsName string = 'AvaLog1'
+
+//-----------------------------------------------------------
+// Log Analytics Workspace (PerGB SKU)
+resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-04-01' = {
+  name: logAnalyticsName
+  location: location
+  properties: {
+    sku: {
+      name: 'PerGB2018'
+    }
+    retentionInDays: 30
+    publicNetworkAccessForIngestion: 'Enabled'
+    publicNetworkAccessForQuery: 'Enabled'
+  }
+}
+
+//-----------------------------------------------------------
+// Key Vault (Public network disabled)
+resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
+  name: keyVaultName
+  location: location
+  properties: {
+    sku: {
+      name: 'standard'
+      family: 'A'
+    }
+    tenantId: subscription().tenantId
+    enableSoftDelete: true
+    publicNetworkAccess: 'Disabled'
+    networkAcls: {
+      bypass: 'AzureServices'
+      defaultAction: 'Deny'
+    }
+  }
+}
+
+//-----------------------------------------------------------
+// Private Endpoint for Key Vault
+resource pe 'Microsoft.Network/privateEndpoints@2023-09-01' = {
+  name: '${keyVaultName}-pe'
+  location: location
+  properties: {
+    subnet: {
+      id: resourceId('Microsoft.Network/virtualNetworks/subnets', spokeVnetName, 'ManagementSubnet')
+    }
+    privateLinkServiceConnections: [
+      {
+        name: 'keyvaultConnection'
+        properties: {
+          privateLinkServiceId: keyVault.id
+          groupIds: [
+            'vault'
+          ]
+        }
+      }
+    ]
+  }
+}
+
+//-----------------------------------------------------------
+// Defender for Cloud – enable plan for Virtual Machines
+resource defenderPlan 'Microsoft.Security/pricings@2023-07-01' = {
+  name: 'VirtualMachines'
+  properties: {
+    pricingTier: 'Standard'
+  }
+}
