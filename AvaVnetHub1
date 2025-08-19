@@ -1,0 +1,57 @@
+// bicep/phase1-hubNetwork/main.bicep
+// Phase 1 – Hub Network (AvaVnetHub1)
+
+@description('Name of the Hub Virtual Network')
+param vnetName string = 'AvaVnetHub1'
+
+@description('Location for the Hub VNet')
+param location string = 'westeurope'
+
+@description('Address prefix for the Hub VNet')
+param vnetAddressPrefix string = '10.0.0.0/16'
+
+@description('Address prefix for the Firewall subnet')
+param firewallSubnetPrefix string = '10.0.1.0/24'
+
+@description('Address prefix for the Bastion subnet')
+param bastionSubnetPrefix string = '10.0.2.0/27'
+
+@description('Address prefix for the Gateway subnet')
+param gatewaySubnetPrefix string = '10.0.3.0/27'
+
+resource hubVnet 'Microsoft.Network/virtualNetworks@2023-09-01' = {
+  name: vnetName
+  location: location
+  properties: {
+    addressSpace: {
+      addressPrefixes: [
+        vnetAddressPrefix
+      ]
+    }
+    subnets: [
+      {
+        name: 'AzureFirewallSubnet'
+        properties: {
+          addressPrefix: firewallSubnetPrefix
+        }
+      }
+      {
+        name: 'AzureBastionSubnet'
+        properties: {
+          addressPrefix: bastionSubnetPrefix
+        }
+      }
+      {
+        name: 'GatewaySubnet'
+        properties: {
+          addressPrefix: gatewaySubnetPrefix
+        }
+      }
+    ]
+  }
+}
+
+output vnetId string = hubVnet.id
+output firewallSubnetId string = hubVnet.properties.subnets[0].id
+output bastionSubnetId string = hubVnet.properties.subnets[1].id
+output gatewaySubnetId string = hubVnet.properties.subnets[2].id
