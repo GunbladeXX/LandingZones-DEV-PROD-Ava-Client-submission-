@@ -1,0 +1,4 @@
+bicep/phase1-hubNetwork/main.bicep
+bicep/phase2-sharedServices/main.bicep
+...
+bicep/phase6-workload/main.bicep
