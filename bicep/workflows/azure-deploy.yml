@@ -1,0 +1,118 @@
+name: AVA Landing Zone Deployment
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AZURE_WEBAPP_PACKAGE_PATH: '.'
+
+jobs:
+  deploy-dev:
+    name: Deploy (DEV)
+    runs-on: ubuntu-latest
+    environment: dev
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # Phase 1
+      - name: Phase 1 – Hub Network (dev)
+        run: |
+          az deployment sub what-if  --location westeurope \
+            --template-file bicep/phase1-hubNetwork/main.bicep
+          az deployment sub create   --location westeurope \
+            --template-file bicep/phase1-hubNetwork/main.bicep
+
+      # Phase 2
+      - name: Phase 2 – Shared Services (dev)
+        run: |
+          az deployment sub create --location westeurope \
+            --template-file bicep/phase2-sharedServices/main.bicep
+
+      # Phase 3
+      - name: Phase 3 – Policy (dev)
+        run: |
+          az deployment sub create --location westeurope \
+            --template-file bicep/phase3-policy/main.bicep
+
+      # Phase 4
+      - name: Phase 4 – Spoke Network (dev)
+        run: |
+          az deployment sub create --location westeurope \
+            --template-file bicep/phase4-spokeNetwork/main.bicep
+
+      # Phase 5
+      - name: Phase 5 – Core Platform (dev)
+        run: |
+          az deployment sub create --location westeurope \
+            --template-file bicep/phase5-corePlatform/main.bicep
+
+      # Phase 6
+      - name: Phase 6 – Workload (dev)
+        run: |
+          az deployment sub create --location westeurope \
+            --template-file bicep/phase6-workload/main.bicep
+
+
+  deploy-prod:
+    name: Deploy (PROD)
+    needs: deploy-dev
+    runs-on: ubuntu-latest
+    environment: prod
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Phase 1 – Hub Network (prod)
+        run: |
+          az deployment sub what-if --location westeurope \
+            --template-file bicep/phase1-hubNetwork/main.bicep
+          az deployment sub create  --location westeurope \
+            --template-file bicep/phase1-hubNetwork/main.bicep
+
+      - name: Phase 2 – Shared Services (prod)
+        run: |
+          az deployment sub create --location westeurope \
+            --template-file bicep/phase2-sharedServices/main.bicep
+
+      - name: Phase 3 – Policy (prod)
+        run: |
+          az deployment sub create --location westeurope \
+            --template-file bicep/phase3-policy/main.bicep
+
+      - name: Phase 4 – Spoke Network (prod)
+        run: |
+          az deployment sub create --location westeurope \
+            --template-file bicep/phase4-spokeNetwork/main.bicep
+
+      - name: Phase 5 – Core Platform (prod)
+        run: |
+          az deployment sub create --location westeurope \
+            --template-file bicep/phase5-corePlatform/main.bicep
+
+      - name: Phase 6 – Workload (prod)
+        run: |
+          az deployment sub create --location westeurope \
+            --template-file bicep/phase6-workload/main.bicep
