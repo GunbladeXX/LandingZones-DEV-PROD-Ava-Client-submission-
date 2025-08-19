@@ -1,0 +1,84 @@
+// bicep/phase4-spokeNetwork/main.bicep
+// Phase 4 – Spoke Network and Peering
+
+@description('Name of the Spoke Virtual Network')
+param spokeVnetName string = 'AvaVnetSpoke1'
+
+@description('Location of the Spoke VNet')
+param location string = 'westeurope'
+
+@description('Address prefix for the Spoke VNet')
+param spokeAddressPrefix string = '10.1.0.0/16'
+
+@description('Hub VNet resource ID (from Phase 1 output)')
+param hubVnetId string
+
+@description('Hub VNet name')
+param hubVnetName string = 'AvaVnetHub1'
+
+//-----------------------------------------------------------
+// Spoke VNet with App, Data, and Management subnets
+resource spokeVnet 'Microsoft.Network/virtualNetworks@2023-09-01' = {
+  name: spokeVnetName
+  location: location
+  properties: {
+    addressSpace: {
+      addressPrefixes: [
+        spokeAddressPrefix
+      ]
+    }
+    subnets: [
+      {
+        name: 'AppSubnet'
+        properties: {
+          addressPrefix: '10.1.1.0/24'
+        }
+      }
+      {
+        name: 'DataSubnet'
+        properties: {
+          addressPrefix: '10.1.2.0/24'
+        }
+      }
+      {
+        name: 'ManagementSubnet'
+        properties: {
+          addressPrefix: '10.1.3.0/24'
+        }
+      }
+    ]
+  }
+}
+
+//-----------------------------------------------------------
+// VNet Peering — Spoke → Hub
+resource peeringSpokeToHub 'Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2023-09-01' = {
+  name: '${spokeVnetName}/AvaHubPeering'
+  properties: {
+    remoteVirtualNetwork: {
+      id: hubVnetId
+    }
+    allowVirtualNetworkAccess: true
+    allowForwardedTraffic: true
+    allowGatewayTransit: false
+    useRemoteGateways: false
+  }
+}
+
+//-----------------------------------------------------------
+// VNet Peering — Hub → Spoke
+resource peeringHubToSpoke 'Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2023-09-01' = {
+  name: '${hubVnetName}/AvaSpokePeering'
+  scope: hubVnetId
+  properties: {
+    remoteVirtualNetwork: {
+      id: spokeVnet.id
+    }
+    allowVirtualNetworkAccess: true
+    allowForwardedTraffic: true
+    allowGatewayTransit: false
+    useRemoteGateways: false
+  }
+}
+
+output spokeVnetId string = spokeVnet.id
