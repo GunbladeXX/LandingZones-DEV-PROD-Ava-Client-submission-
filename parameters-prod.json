@@ -1,0 +1,24 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "vnetName": {
+      "value": "AvaVnetHub1"
+    },
+    "location": {
+      "value": "westeurope"
+    },
+    "vnetAddressPrefix": {
+      "value": "10.0.0.0/16"
+    },
+    "firewallSubnetPrefix": {
+      "value": "10.0.1.0/24"
+    },
+    "bastionSubnetPrefix": {
+      "value": "10.0.2.0/27"
+    },
+    "gatewaySubnetPrefix": {
+      "value": "10.0.3.0/27"
+    }
+  }
+}
